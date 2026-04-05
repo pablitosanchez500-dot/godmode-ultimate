@@ -15,8 +15,11 @@ button { padding:10px; margin:5px; cursor:pointer; border-radius:8px; }
 </style>
 </head>
 <body>
+
 <div class="container">
 <h2>💰 Matched Betting GOD MODE</h2>
+
+<!-- Calculadora -->
 <div class="card">
 <h3>🎯 Calculadora inteligente</h3>
 <select id="tipo">
@@ -29,32 +32,50 @@ button { padding:10px; margin:5px; cursor:pointer; border-radius:8px; }
 <input type="number" id="com" value="5" placeholder="Comisión %">
 <button onclick="analizar()">🤖 Analizar</button>
 </div>
+
 <div id="res" class="result"></div>
+
+<!-- Decisión automática -->
 <div class="card">
 <h3>🤖 Decisión automática</h3>
 <div id="decision"></div>
 </div>
+
+<!-- Simulador -->
 <div class="card">
 <h3>📈 Simulador PRO</h3>
 <div id="sim"></div>
 </div>
+
+<!-- Objetivo diario -->
 <div class="card">
 <h3>📊 Objetivo diario</h3>
 <input type="number" id="objetivo" value="20"> € / día
 <button onclick="calcularObjetivo()">Calcular plan</button>
 <div id="plan"></div>
 </div>
+
+<!-- Top 5 partidos automáticamente -->
+<div class="card">
+<h3>⚡ Partidos con mejores cuotas</h3>
+<div id="mejores-partidos">Cargando...</div>
+</div>
+
 </div>
 
 <script>
+// Calculadora
 async function analizar(){
  let stake = parseFloat(stakeEl.value)||0;
  let back = parseFloat(backEl.value)||0;
  let lay = parseFloat(layEl.value)||0;
  let com = (parseFloat(comEl.value)||0)/100;
  let tipo = tipoEl.value;
+
  if(back<=1||lay<=1){ res.innerHTML="❌ Cuotas inválidas"; return; }
+
  let layStake, liability, win, lose;
+
  if(tipo==="freebet"){
   layStake = (stake*(back-1))/(lay-com);
   liability = layStake*(lay-1);
@@ -66,11 +87,14 @@ async function analizar(){
   win = (stake*(back-1))-liability;
   lose = (layStake*(1-com))-stake;
  }
+
  let media=(win+lose)/2;
  let roi=(media/liability)*100;
  let conv=(tipo==="freebet")?(media/stake)*100:0;
  let spread=lay-back;
+
  let color = media>0?"good":"bad";
+
  res.innerHTML=`
  Lay stake: ${layStake.toFixed(2)}€<br>
  Liability: ${liability.toFixed(2)}€<br>
@@ -79,12 +103,17 @@ async function analizar(){
  Conversión: ${conv.toFixed(1)}%<br>
  Spread: ${spread.toFixed(2)}
  `;
+
+ // Decisión
  let decisionTxt="";
  if(conv>80 && spread<0.25) decisionTxt="🔥 ENTRA YA (nivel dios)";
  else if(conv>70) decisionTxt="👍 BUENA";
  else if(conv>60) decisionTxt="⚖️ ESPERAR";
  else decisionTxt="❌ PASAR";
+
  decision.innerHTML = decisionTxt;
+
+ // Simulador
  let mejores=[];
  for(let i=0;i<5;i++){
   let testLay = lay - (i*0.1);
@@ -94,12 +123,45 @@ async function analizar(){
  sim.innerHTML = mejores.join("<br>");
  window.lastMedia = media;
 }
+
+// Objetivo diario
 function calcularObjetivo(){
  let objetivo = parseFloat(objetivoEl.value)||0;
  let media = window.lastMedia || 5;
  let necesarias = objetivo / media;
  plan.innerHTML = `Necesitas aprox <b>${Math.ceil(necesarias)}</b> apuestas al día<br>Beneficio medio actual: ${media.toFixed(2)}€`;
 }
+
+// Top partidos automáticamente
+async function cargarPartidos() {
+  const contenedor = document.getElementById("mejores-partidos");
+  try {
+    const res = await fetch("/api/odds");
+    const data = await res.json();
+
+    const partidos = data.events
+      .map(event => ({
+        nombre: `${event.home_team} vs ${event.away_team}`,
+        cuotaMax: Math.max(...event.markets[0].outcomes.map(o => o.price))
+      }))
+      .sort((a,b) => b.cuotaMax - a.cuotaMax)
+      .slice(0,5);
+
+    contenedor.innerHTML = partidos.map(p => 
+      `<b>${p.nombre}</b> → Cuota máxima: ${p.cuotaMax.toFixed(2)}`
+    ).join("<br>");
+
+  } catch(e) {
+    console.error(e);
+    contenedor.innerHTML = "❌ Error al cargar los partidos";
+  }
+}
+
+// Llamar al cargar la página y refrescar cada 5 min
+cargarPartidos();
+setInterval(cargarPartidos, 300000);
+
+// Elementos
 const stakeEl = document.getElementById('stake');
 const backEl = document.getElementById('back');
 const layEl = document.getElementById('lay');
@@ -111,5 +173,6 @@ const sim = document.getElementById('sim');
 const objetivoEl = document.getElementById('objetivo');
 const plan = document.getElementById('plan');
 </script>
+
 </body>
 </html>
